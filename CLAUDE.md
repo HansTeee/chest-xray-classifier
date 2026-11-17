@@ -12,11 +12,13 @@ Read `PLAN.md` for the architecture and the **pre-registered evaluation criteria
    metrics, the confusion matrix and ROC curve (as image artifacts), and the
    model artifact.
 3. **Every user-facing surface** (Streamlit UI, FastAPI OpenAPI docs, README,
-   HF model/Space READMEs) shows a clear disclaimer: *educational demo, not a
+   GitHub Release notes) shows a clear disclaimer: *educational demo, not a
    medical device, not for clinical use.*
 4. **Commit after each completed phase** with a descriptive message.
-5. **Model weights never go into git.** They live in the Hugging Face model
-   repo and are downloaded at startup.
+5. **Model weights never go into git.** They are a GitHub Release asset
+   (`model-v1`), downloaded at startup from `MODEL_URL` and checked against
+   `MODEL_SHA256`. New weights mean a new release tag and an updated URL/hash
+   in `docker/Dockerfile`.
 6. **Report metrics honestly, including the bad ones.** Report pass/fail
    against the pre-registered criteria in PLAN.md. Do not move the goalposts.
 
@@ -36,3 +38,6 @@ Read `PLAN.md` for the architecture and the **pre-registered evaluation criteria
 - Lint with `ruff` before committing.
 - Dataset attribution: Kermany et al., CC BY 4.0. Show it wherever sample
   images appear.
+- **No Hugging Face** (user decision, Phase 5). Repo: github.com/HansTeee/chest-xray-classifier.
+  CI/CD: `.github/workflows/ci-cd.yml` (ruff -> pytest -> docker build + smoke
+  test; on main, push to ghcr.io/hansteee/chest-xray-classifier).

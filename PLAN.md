@@ -28,8 +28,13 @@ ages 1-5, from Guangzhou Women and Children's Medical Center.
 | Inference API | FastAPI (`api/`) | `/health`, `/model-info`, `/predict` (returns a Grad-CAM overlay) |
 | Frontend | Streamlit (`ui/`) | Upload or sample images, prediction, probability, heatmap, model card |
 | Packaging | Docker (`docker/`), docker-compose | One CPU-only image running the API (8000, internal) and the UI (7860) |
-| CI/CD | GitHub Actions (`.github/workflows/`) | ruff, pytest, docker build; deploy to a HF Docker Space on `main` |
-| Weight hosting | Hugging Face model repo | `model.pt` and `model_card.json`, downloaded at startup, **never in git** |
+| CI/CD | GitHub Actions (`.github/workflows/`) | ruff, pytest, docker build + container smoke test; publish image to GHCR on `main` |
+| Weight hosting | GitHub Release asset (`model-v1`) | `model.pt` and `model_card.json`, downloaded at startup from `MODEL_URL` and checked against a SHA-256, **never in git** |
+
+> **Change (Phase 5):** Hugging Face (model repo and Docker Space) was dropped
+> at the user's request. Weights are now a GitHub Release asset, and the
+> deployable artifact is a public container image on GHCR that can run on any
+> Docker host.
 
 ### Component diagram
 
@@ -43,21 +48,21 @@ flowchart LR
         EVAL --> W[models/model.pt<br/>models/model_card.json]
     end
 
-    W -- huggingface_hub upload --> HFM[(HF model repo)]
+    W -- gh release upload --> REL[(GitHub Release<br/>model-v1)]
 
-    subgraph Runtime["Container (HF Docker Space / docker-compose)"]
+    subgraph Runtime["Container (docker-compose / any Docker host)"]
         UI[Streamlit UI :7860] -- HTTP --> API[FastAPI :8000<br/>/health /model-info /predict]
         API --> GC[src/gradcam.py]
-        API -- download weights at startup --> HFM
+        API -- MODEL_URL + SHA-256 check at startup --> REL
     end
 
     USER((Visitor)) --> UI
 
     subgraph CICD["GitHub Actions"]
-        PUSH[push / PR] --> LINT[ruff] --> TEST[pytest<br/>random-weight fixture] --> BUILD[docker build]
-        BUILD -- main only --> DEPLOY[upload_folder to HF Space]
+        PUSH[push / PR] --> LINT[ruff] --> TEST[pytest<br/>random-weight fixture] --> BUILD[docker build<br/>+ smoke test]
+        BUILD -- main only --> GHCR[(ghcr.io image)]
     end
-    DEPLOY --> Runtime
+    GHCR --> Runtime
 ```
 
 ## 3. Data plan
@@ -189,7 +194,7 @@ MLflow runs (validation, best epoch):
 | 2 | Data normalization, patient split, training + MLflow, threshold, single test eval, model card | Done |
 | 3 | FastAPI service, Grad-CAM, pytest (random-weight fixture), ruff | Done |
 | 4 | Streamlit UI, Dockerfile (API + UI), docker-compose | Done |
-| 5 | HF model repo upload, GitHub Actions CI/CD, HF Space deploy | Pending |
+| 5 | Weights as GitHub Release asset, GitHub Actions CI/CD, image published to GHCR | Done |
 | 6 | Portfolio README, demo script | Pending |
 
 ## 7. Known limitations (to be stated everywhere results appear)

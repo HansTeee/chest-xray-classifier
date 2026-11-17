@@ -83,13 +83,13 @@ def test_openapi_has_disclaimer(client):
 
 def test_missing_model_without_repo_degrades_gracefully(tmp_path):
     old = _set_env(
-        MODEL_PATH=tmp_path / "missing.pt", MODEL_CARD_PATH=tmp_path / "missing.json", HF_MODEL_REPO=None
+        MODEL_PATH=tmp_path / "missing.pt", MODEL_CARD_PATH=tmp_path / "missing.json", MODEL_URL=None
     )
     try:
         with TestClient(api_main.app) as c:
             h = c.get("/health").json()
             assert h["model_loaded"] is False and h["status"] == "degraded"
-            assert "HF_MODEL_REPO" in h["error"]
+            assert "MODEL_URL" in h["error"]
             assert c.post("/predict", files={"file": ("x.png", make_png(), "image/png")}).status_code == 503
             assert c.get("/model-info").status_code == 503
     finally:
@@ -100,3 +100,36 @@ def test_missing_model_without_repo_degrades_gracefully(tmp_path):
 @pytest.mark.parametrize("path", ["/docs", "/openapi.json"])
 def test_docs_available(client, path):
     assert client.get(path).status_code == 200
+
+
+def _sha256(path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("good_hash", [True, False])
+def test_weights_downloaded_from_model_url_with_sha_check(tmp_path, model_files, good_hash):
+    src_model, src_card, card = model_files
+    dest = tmp_path / "dl" / "model.pt"
+    old = _set_env(
+        MODEL_PATH=dest,
+        MODEL_CARD_PATH=tmp_path / "dl" / "model_card.json",
+        MODEL_URL=src_model.as_uri(),  # file:// URL, so no network needed
+        MODEL_CARD_URL=src_card.as_uri(),
+        MODEL_SHA256=_sha256(src_model) if good_hash else "0" * 64,
+    )
+    try:
+        with TestClient(api_main.app) as c:
+            h = c.get("/health").json()
+            if good_hash:
+                assert h["model_loaded"] is True
+                assert dest.exists()
+                assert c.get("/model-info").json() == card
+            else:
+                assert h["model_loaded"] is False
+                assert "SHA-256 mismatch" in h["error"]
+                assert not dest.exists()  # partial download removed
+    finally:
+        _set_env(**old)
+        api_main.load_state(api_main.app)

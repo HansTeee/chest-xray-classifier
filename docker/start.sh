@@ -7,7 +7,7 @@ echo "Starting FastAPI on :8000 ..."
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 1 &
 API_PID=$!
 
-# Wait for the API to come up (the model may be downloading from Hugging Face)
+# Wait for the API to come up (the model may be downloading from MODEL_URL)
 for _ in $(seq 1 120); do
   if python -c "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=2)" 2>/dev/null; then
     echo "API is up."

@@ -60,7 +60,7 @@ def _set_env(**kv):
 @pytest.fixture(scope="session")
 def client(model_files):
     model_path, card_path, _ = model_files
-    old = _set_env(MODEL_PATH=model_path, MODEL_CARD_PATH=card_path, HF_MODEL_REPO=None, HF_HUB_OFFLINE="1")
+    old = _set_env(MODEL_PATH=model_path, MODEL_CARD_PATH=card_path, MODEL_URL=None)
     from api.main import app
 
     with TestClient(app) as c:  # runs lifespan -> loads the random-weight checkpoint

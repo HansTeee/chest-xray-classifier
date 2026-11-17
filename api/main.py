@@ -7,11 +7,13 @@ Run locally (CMD):
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import logging
 import os
 import time
+import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -59,26 +61,36 @@ def _paths() -> tuple[Path, Path]:
     )
 
 
-def _download_from_hub(model_path: Path, card_path: Path) -> None:
-    repo = os.getenv("HF_MODEL_REPO")
-    if not repo:
-        raise FileNotFoundError(f"{model_path} not found and HF_MODEL_REPO is not set")
-    from huggingface_hub import hf_hub_download
+def _fetch(url: str, dest: Path, sha256: str | None = None, timeout: int = 120) -> None:
+    """Download url -> dest atomically, optionally verifying a SHA-256 digest."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    h = hashlib.sha256()
+    req = urllib.request.Request(url, headers={"User-Agent": "chest-xray-classifier"})
+    with urllib.request.urlopen(req, timeout=timeout) as r, open(tmp, "wb") as f:
+        while chunk := r.read(1 << 20):
+            h.update(chunk)
+            f.write(chunk)
+    if sha256 and h.hexdigest().lower() != sha256.lower():
+        tmp.unlink(missing_ok=True)
+        raise ValueError(f"SHA-256 mismatch for {url}: got {h.hexdigest()}, expected {sha256}")
+    tmp.replace(dest)
 
-    log.info("Downloading weights from Hugging Face repo %s", repo)
-    model_path.parent.mkdir(parents=True, exist_ok=True)
-    token = os.getenv("HF_TOKEN") or None
-    for fname, dest in (("model.pt", model_path), ("model_card.json", card_path)):
+
+def _download_weights(model_path: Path, card_path: Path) -> None:
+    """Download weights (and the model card) from MODEL_URL / MODEL_CARD_URL,
+    e.g. GitHub Release assets. Weights are never committed to git."""
+    url = os.getenv("MODEL_URL")
+    if not url:
+        raise FileNotFoundError(f"{model_path} not found and MODEL_URL is not set")
+    log.info("Downloading weights from %s", url)
+    _fetch(url, model_path, os.getenv("MODEL_SHA256") or None)
+    card_url = os.getenv("MODEL_CARD_URL")
+    if card_url and not card_path.exists():
         try:
-            src = hf_hub_download(repo_id=repo, filename=fname, token=token)
+            _fetch(card_url, card_path)
         except Exception:
-            if fname == "model_card.json":
-                log.warning("model_card.json not found in %s", repo)
-                continue
-            raise
-        if Path(src).resolve() != dest.resolve():
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(Path(src).read_bytes())
+            log.warning("Could not download model card from %s", card_url, exc_info=True)
 
 
 def load_state(app: FastAPI) -> None:
@@ -87,7 +99,7 @@ def load_state(app: FastAPI) -> None:
     model_path, card_path = _paths()
     try:
         if not model_path.exists():
-            _download_from_hub(model_path, card_path)
+            _download_weights(model_path, card_path)
         torch.set_num_threads(max(1, int(os.getenv("TORCH_THREADS", os.cpu_count() or 1))))
         model, meta = load_checkpoint(model_path, map_location="cpu")
         app.state.model, app.state.meta = model, meta

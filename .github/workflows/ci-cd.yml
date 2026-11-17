@@ -1,0 +1,140 @@
+name: CI/CD
+
+# Every push and PR: ruff -> pytest -> docker build + container smoke test.
+# Push to main (only if all of that passes): publish the image to GHCR.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/chest-xray-classifier
+
+jobs:
+  lint-test:
+    name: Lint & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements-serve.txt
+            requirements-dev.txt
+
+      - name: Install dependencies (CPU-only torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1 torchvision==0.20.1
+          pip install -r requirements-dev.txt
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+      - name: Pytest (random-weight fixture, no real weights, no network)
+        run: pytest -v
+
+  docker:
+    name: Docker build & smoke test
+    needs: lint-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          load: true
+          push: false
+          tags: chest-xray-classifier:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image size
+        run: docker image ls chest-xray-classifier:ci
+
+      - name: Smoke test (downloads weights from the GitHub Release at startup)
+        run: |
+          docker run -d --name app -p 7860:7860 -p 8000:8000 chest-xray-classifier:ci
+          for i in $(seq 1 90); do
+            if curl -fs localhost:8000/health | grep -q '"model_loaded":true'; then break; fi
+            sleep 2
+          done
+          echo "--- /health"; curl -fsS localhost:8000/health; echo
+          echo "--- UI";      curl -fsS localhost:7860/_stcore/health; echo
+          echo "--- /predict (pneumonia sample)"
+          curl -fsS -X POST localhost:8000/predict -F "file=@ui/samples/pneumonia_1.jpeg;type=image/jpeg" \
+            | jq '{label, pneumonia_probability, threshold, inference_ms}' | tee pred.json
+          test "$(jq -r .label pred.json)" = "PNEUMONIA"
+          echo "--- /predict (non-image must be rejected)"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:8000/predict -F 'file=@PLAN.md;type=image/png')" = "415"
+
+      - name: Container logs
+        if: always()
+        run: docker logs app || true
+
+  publish:
+    name: Publish image to GHCR
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Build & push (reuses the cached layers from the docker job)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published"
+            echo '```'
+            echo "docker run -p 7860:7860 ${{ env.IMAGE }}:latest"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

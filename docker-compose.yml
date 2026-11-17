@@ -2,9 +2,9 @@
 #   docker compose up --build
 # UI:  http://localhost:7860     API docs: http://localhost:8000/docs
 #
-# Weights: by default ./models (containing model.pt + model_card.json) is
-# mounted. If it is empty, set HF_MODEL_REPO so the container downloads them:
-#   set HF_MODEL_REPO=<user>/chest-xray-classifier-model && docker compose up
+# Weights: ./models (containing model.pt + model_card.json) is mounted. If it
+# is empty, the container downloads them from MODEL_URL (the GitHub Release
+# asset set as the image default) and verifies the SHA-256.
 
 services:
   app:
@@ -15,10 +15,9 @@ services:
     container_name: chest-xray-classifier
     ports:
       - "7860:7860"   # Streamlit UI
-      - "8000:8000"   # FastAPI (exposed locally for /docs; not exposed on HF Spaces)
+      - "8000:8000"   # FastAPI (exposed locally for /docs)
     environment:
-      HF_MODEL_REPO: ${HF_MODEL_REPO:-}
-      HF_TOKEN: ${HF_TOKEN:-}
+      TORCH_THREADS: 4
     volumes:
       - ./models:/home/user/app/models
     restart: unless-stopped
