@@ -251,7 +251,7 @@ python -m src.train --run-name dn121_full_lr1e-4 --lr 1e-4 --unfreeze all
 python -m src.train --run-name dn121_full_lr3e-4 --lr 3e-4 --unfreeze all
 python -m src.train --run-name dn121_last1_lr1e-3 --lr 1e-3 --unfreeze 1
 python -m src.evaluate final
-mlflow ui --backend-store-uri ./mlruns
+mlflow_ui.bat
 ```
 `src.evaluate final` runs the test set **once**. Delete `models\test_results.json`
 only if you are starting a genuinely new experiment.
