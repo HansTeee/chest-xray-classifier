@@ -1,0 +1,22 @@
+[
+  {
+    "file": "normal_1.jpeg",
+    "label": "NORMAL",
+    "source": "chest_xray/test/NORMAL/IM-0039-0001.jpeg"
+  },
+  {
+    "file": "normal_2.jpeg",
+    "label": "NORMAL",
+    "source": "chest_xray/test/NORMAL/NORMAL2-IM-0045-0001.jpeg"
+  },
+  {
+    "file": "pneumonia_1.jpeg",
+    "label": "PNEUMONIA",
+    "source": "chest_xray/test/PNEUMONIA/person1_virus_7.jpeg"
+  },
+  {
+    "file": "pneumonia_2.jpeg",
+    "label": "PNEUMONIA",
+    "source": "chest_xray/test/PNEUMONIA/person21_virus_53.jpeg"
+  }
+]

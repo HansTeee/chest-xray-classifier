@@ -1,0 +1,15 @@
+# Keep the build context small; the Dockerfile copies files explicitly anyway.
+.git
+.github
+.venv
+data
+mlruns
+mlartifacts
+models
+tests
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+*.md
+!ui/samples/ATTRIBUTION.md

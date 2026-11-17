@@ -1,0 +1,17 @@
+[server]
+headless = true
+port = 7860
+address = "0.0.0.0"
+maxUploadSize = 10
+# HF Spaces serves the app inside an iframe behind a proxy; XSRF/CORS checks
+# otherwise break file uploads there (HTTP 403).
+enableXsrfProtection = false
+enableCORS = false
+fileWatcherType = "none"
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
