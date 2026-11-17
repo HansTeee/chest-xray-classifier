@@ -1,0 +1,32 @@
+# Data (never committed; dataset is downloaded via kagglehub)
+data/
+
+# MLflow local store
+mlruns/
+mlartifacts/
+
+# Model weights (hosted on Hugging Face, never in git)
+models/*.pt
+models/*.pth
+models/*.onnx
+models/*.safetensors
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets / local env
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
