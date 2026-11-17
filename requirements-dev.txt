@@ -1,0 +1,5 @@
+# CI / local testing: serving deps (CPU torch) + test and lint tools.
+-r requirements-serve.txt
+pytest>=8.3
+httpx>=0.27
+ruff>=0.7

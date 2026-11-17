@@ -37,3 +37,4 @@ models/candidates/
 models/_artifacts/
 models/_eval_artifacts/
 models/train_log.txt
+models/_uvicorn.log

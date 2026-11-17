@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import matplotlib
@@ -23,7 +23,7 @@ import numpy as np  # noqa: E402
 import torch  # noqa: E402
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve  # noqa: E402
 
-from src.data import CLASSES, IMG_SIZE, IMAGENET_MEAN, IMAGENET_STD, make_loader, read_manifest  # noqa: E402
+from src.data import CLASSES, IMAGENET_MEAN, IMAGENET_STD, IMG_SIZE, make_loader, read_manifest  # noqa: E402
 from src.model import load_checkpoint, save_checkpoint  # noqa: E402
 
 TARGET_SENSITIVITY = 0.95
@@ -77,8 +77,15 @@ def plot_confusion(m: dict, title: str, path: Path) -> Path:
     fig, ax = plt.subplots(figsize=(4.2, 3.8))
     ax.imshow(cm, cmap="Blues")
     for (i, j), v in np.ndenumerate(cm):
-        ax.text(j, i, str(v), ha="center", va="center", fontsize=14,
-                color="white" if v > cm.max() / 2 else "black")
+        ax.text(
+            j,
+            i,
+            str(v),
+            ha="center",
+            va="center",
+            fontsize=14,
+            color="white" if v > cm.max() / 2 else "black",
+        )
     ax.set_xticks([0, 1], [f"pred {c}" for c in CLASSES])
     ax.set_yticks([0, 1], [f"true {c}" for c in CLASSES])
     ax.set_title(title, fontsize=10)
@@ -94,8 +101,13 @@ def plot_roc(y: np.ndarray, p: np.ndarray, threshold: float, title: str, path: P
     fig, ax = plt.subplots(figsize=(4.5, 4.2))
     ax.plot(fpr, tpr, lw=2, label=f"AUC = {m['auc']:.3f}")
     ax.plot([0, 1], [0, 1], "--", color="grey", lw=1)
-    ax.scatter([1 - m["specificity"]], [m["sensitivity"]], color="red", zorder=3,
-               label=f"t={threshold:.3f} (sens {m['sensitivity']:.2f}, spec {m['specificity']:.2f})")
+    ax.scatter(
+        [1 - m["specificity"]],
+        [m["sensitivity"]],
+        color="red",
+        zorder=3,
+        label=f"t={threshold:.3f} (sens {m['sensitivity']:.2f}, spec {m['specificity']:.2f})",
+    )
     ax.set_xlabel("False positive rate (1 - specificity)")
     ax.set_ylabel("True positive rate (sensitivity)")
     ax.set_title(title, fontsize=10)
@@ -153,8 +165,14 @@ def final_evaluation() -> None:
     }
 
     MODELS_DIR.mkdir(exist_ok=True)
-    save_checkpoint(model.cpu(), meta["arch"], MODELS_DIR / "model.pt",
-                    threshold=threshold, class_names=list(CLASSES), img_size=IMG_SIZE)
+    save_checkpoint(
+        model.cpu(),
+        meta["arch"],
+        MODELS_DIR / "model.pt",
+        threshold=threshold,
+        class_names=list(CLASSES),
+        img_size=IMG_SIZE,
+    )
 
     rows = read_manifest()
     split_counts = {
@@ -168,8 +186,11 @@ def final_evaluation() -> None:
         "pretrained_on": "ImageNet-1k (torchvision IMAGENET1K_V1)",
         "classes": list(CLASSES),
         "positive_class": "PNEUMONIA",
-        "input": {"size": [IMG_SIZE, IMG_SIZE], "channels": "grayscale replicated to RGB",
-                  "normalization": {"mean": IMAGENET_MEAN, "std": IMAGENET_STD}},
+        "input": {
+            "size": [IMG_SIZE, IMG_SIZE],
+            "channels": "grayscale replicated to RGB",
+            "normalization": {"mean": IMAGENET_MEAN, "std": IMAGENET_STD},
+        },
         "threshold": threshold,
         "threshold_selection": f"Highest threshold with validation sensitivity >= {TARGET_SENSITIVITY}",
         "validation_metrics": val_m,
@@ -181,18 +202,28 @@ def final_evaluation() -> None:
         "dataset": {
             "name": "Chest X-Ray Images (Pneumonia)",
             "source": "Kermany et al., Mendeley Data v2, doi:10.17632/rscbjbr9sj.2 "
-                      "(Kaggle mirror paultimothymooney/chest-xray-pneumonia)",
+            "(Kaggle mirror paultimothymooney/chest-xray-pneumonia)",
             "license": "CC BY 4.0",
             "population": "Pediatric patients aged 1-5, Guangzhou Women and Children's Medical Center",
             "splits": split_counts,
             "split_method": "Patient-level 15% validation carved from official train (seed 42); "
-                            "official test set held out and evaluated once.",
+            "official test set held out and evaluated once.",
         },
-        "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "created_utc": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     (MODELS_DIR / "model_card.json").write_text(json.dumps(card, indent=2))
-    GUARD.write_text(json.dumps({"threshold": threshold, "test": test_m, "criteria": criteria,
-                                 "run_id": run.info.run_id, "created_utc": card["created_utc"]}, indent=2))
+    GUARD.write_text(
+        json.dumps(
+            {
+                "threshold": threshold,
+                "test": test_m,
+                "criteria": criteria,
+                "run_id": run.info.run_id,
+                "created_utc": card["created_utc"],
+            },
+            indent=2,
+        )
+    )
 
     # Log to the selected MLflow run
     art = MODELS_DIR / "_eval_artifacts"
@@ -201,13 +232,25 @@ def final_evaluation() -> None:
         mlflow.log_metric("final_threshold", threshold)
         mlflow.log_metrics({f"test_{k}": float(v) for k, v in test_m.items()})
         mlflow.set_tag("selected_for_test", "true")
-        mlflow.log_artifact(str(plot_confusion(test_m, f"TEST confusion matrix (t={threshold:.3f})",
-                                               art / "test_confusion_matrix.png")), "test")
-        mlflow.log_artifact(str(plot_roc(yt, pt, threshold, "TEST ROC curve", art / "test_roc_curve.png")), "test")
+        mlflow.log_artifact(
+            str(
+                plot_confusion(
+                    test_m, f"TEST confusion matrix (t={threshold:.3f})", art / "test_confusion_matrix.png"
+                )
+            ),
+            "test",
+        )
+        mlflow.log_artifact(
+            str(plot_roc(yt, pt, threshold, "TEST ROC curve", art / "test_roc_curve.png")), "test"
+        )
         mlflow.log_artifact(str(MODELS_DIR / "model_card.json"), "test")
 
-    print(json.dumps({"run": run_name, "threshold": threshold, "val": val_m, "test": test_m,
-                      "criteria": criteria}, indent=2))
+    print(
+        json.dumps(
+            {"run": run_name, "threshold": threshold, "val": val_m, "test": test_m, "criteria": criteria},
+            indent=2,
+        )
+    )
 
 
 def main() -> None:

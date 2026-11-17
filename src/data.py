@@ -87,10 +87,7 @@ def patient_id(filename: str, cls: str) -> str:
     images of the same personN are grouped together, which is conservative).
     NORMAL: IM-0115-0001.jpeg -> IM-0115; NORMAL2-IM-0383-0001.jpeg -> NORMAL2-IM-0383.
     """
-    if cls == "PNEUMONIA":
-        m = _PNEU_RE.match(filename)
-    else:
-        m = _NORMAL_RE.match(filename)
+    m = _PNEU_RE.match(filename) if cls == "PNEUMONIA" else _NORMAL_RE.match(filename)
     if not m:
         raise ValueError(f"Cannot parse patient id from {filename!r}")
     return f"{cls}:{m.group(1)}"
@@ -201,8 +198,13 @@ def normalize_transform() -> v2.Compose:
     return v2.Compose([v2.ToDtype(torch.float32, scale=True), v2.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
 
 
-def gpu_augment(x: torch.Tensor, max_rot_deg: float = 10.0, max_shift: float = 0.05,
-                max_scale: float = 0.05, jitter: float = 0.2) -> torch.Tensor:
+def gpu_augment(
+    x: torch.Tensor,
+    max_rot_deg: float = 10.0,
+    max_shift: float = 0.05,
+    max_scale: float = 0.05,
+    jitter: float = 0.2,
+) -> torch.Tensor:
     """Batched light augmentation on-device, per-sample random params.
 
     uint8 Bx3xHxW -> normalized float. Small rotation/shift/scale and

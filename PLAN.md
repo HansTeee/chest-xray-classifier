@@ -187,7 +187,7 @@ MLflow runs (validation, best epoch):
 |---|---|---|
 | 1 | Plan, scaffold, venv, requirements, CLAUDE.md, first commit | Done |
 | 2 | Data normalization, patient split, training + MLflow, threshold, single test eval, model card | Done |
-| 3 | FastAPI service, Grad-CAM, pytest (random-weight fixture), ruff | Pending |
+| 3 | FastAPI service, Grad-CAM, pytest (random-weight fixture), ruff | Done |
 | 4 | Streamlit UI, Dockerfile (API + UI), docker-compose | Pending |
 | 5 | HF model repo upload, GitHub Actions CI/CD, HF Space deploy | Pending |
 | 6 | Portfolio README, demo script | Pending |

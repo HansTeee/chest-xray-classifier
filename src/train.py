@@ -78,19 +78,29 @@ def main() -> None:
     mlflow.set_experiment(EXPERIMENT)
     with mlflow.start_run(run_name=args.run_name) as run:
         mlflow.set_tag("stage", "train")
-        mlflow.log_params({
-            "arch": args.arch, "pretrained": "imagenet", "lr": args.lr,
-            "weight_decay": args.weight_decay, "epochs": args.epochs,
-            "batch_size": args.batch_size, "unfreeze": args.unfreeze,
-            "trainable_params": sum(p.numel() for p in params),
-            "optimizer": "AdamW", "scheduler": "cosine", "amp": device.type == "cuda",
-            "img_size": IMG_SIZE, "seed": args.seed,
-            "class_weights": [round(float(w), 4) for w in weights.cpu()],
-            "augmentation": "rotation10, affine(translate .05, scale .95-1.05), "
-                            "brightness/contrast .2, NO hflip",
-            "n_train": len(y_train), "n_val": len(val_loader.dataset),
-            "device": str(device),
-        })
+        mlflow.log_params(
+            {
+                "arch": args.arch,
+                "pretrained": "imagenet",
+                "lr": args.lr,
+                "weight_decay": args.weight_decay,
+                "epochs": args.epochs,
+                "batch_size": args.batch_size,
+                "unfreeze": args.unfreeze,
+                "trainable_params": sum(p.numel() for p in params),
+                "optimizer": "AdamW",
+                "scheduler": "cosine",
+                "amp": device.type == "cuda",
+                "img_size": IMG_SIZE,
+                "seed": args.seed,
+                "class_weights": [round(float(w), 4) for w in weights.cpu()],
+                "augmentation": "rotation10, affine(translate .05, scale .95-1.05), "
+                "brightness/contrast .2, NO hflip",
+                "n_train": len(y_train),
+                "n_val": len(val_loader.dataset),
+                "device": str(device),
+            }
+        )
 
         best_auc, best_state, best_epoch = -1.0, None, -1
         for epoch in range(1, args.epochs + 1):
@@ -103,8 +113,9 @@ def main() -> None:
                 x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
                 x = gpu_augment(x)
                 optimizer.zero_grad(set_to_none=True)
-                with torch.autocast(device_type=device.type, dtype=torch.float16,
-                                    enabled=device.type == "cuda"):
+                with torch.autocast(
+                    device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda"
+                ):
                     logits = model(x)
                     loss = criterion(logits, y)
                 scaler.scale(loss).backward()
@@ -125,14 +136,23 @@ def main() -> None:
                 ).item()
             val_auc = roc_auc_score(yv, pv)
             train_auc = roc_auc_score(tr_y, tr_p) if len(set(tr_y)) > 1 else float("nan")
-            mlflow.log_metrics({
-                "train_loss": float(np.mean(losses)), "val_loss": val_loss,
-                "train_auc": train_auc, "val_auc": val_auc,
-                "lr": scheduler.get_last_lr()[0], "epoch_time_s": epoch_time,
-            }, step=epoch)
-            print(f"[{args.run_name}] epoch {epoch}/{args.epochs}  train_loss {np.mean(losses):.4f}  "
-                  f"val_loss {val_loss:.4f}  train_auc {train_auc:.4f}  val_auc {val_auc:.4f}  "
-                  f"({epoch_time:.1f}s)", flush=True)
+            mlflow.log_metrics(
+                {
+                    "train_loss": float(np.mean(losses)),
+                    "val_loss": val_loss,
+                    "train_auc": train_auc,
+                    "val_auc": val_auc,
+                    "lr": scheduler.get_last_lr()[0],
+                    "epoch_time_s": epoch_time,
+                },
+                step=epoch,
+            )
+            print(
+                f"[{args.run_name}] epoch {epoch}/{args.epochs}  train_loss {np.mean(losses):.4f}  "
+                f"val_loss {val_loss:.4f}  train_auc {train_auc:.4f}  val_auc {val_auc:.4f}  "
+                f"({epoch_time:.1f}s)",
+                flush=True,
+            )
             if val_auc > best_auc:
                 best_auc, best_epoch = val_auc, epoch
                 best_state = copy.deepcopy(model.state_dict())
@@ -142,24 +162,45 @@ def main() -> None:
         pv, yv = predict_probs(model, val_loader, device)
         thr = choose_threshold(yv, pv, TARGET_SENSITIVITY)
         vm = metrics_at(yv, pv, thr)
-        mlflow.log_metrics({"best_val_auc": best_auc, "best_epoch": best_epoch,
-                            "val_threshold": thr, "val_sensitivity": vm["sensitivity"],
-                            "val_specificity": vm["specificity"], "val_accuracy": vm["accuracy"]})
+        mlflow.log_metrics(
+            {
+                "best_val_auc": best_auc,
+                "best_epoch": best_epoch,
+                "val_threshold": thr,
+                "val_sensitivity": vm["sensitivity"],
+                "val_specificity": vm["specificity"],
+                "val_accuracy": vm["accuracy"],
+            }
+        )
 
         art = Path("models/_artifacts") / args.run_name
         art.mkdir(parents=True, exist_ok=True)
-        mlflow.log_artifact(str(plot_confusion(vm, f"{args.run_name}: VAL confusion (t={thr:.3f})",
-                                               art / "val_confusion_matrix.png")), "val")
-        mlflow.log_artifact(str(plot_roc(yv, pv, thr, f"{args.run_name}: VAL ROC",
-                                         art / "val_roc_curve.png")), "val")
+        mlflow.log_artifact(
+            str(
+                plot_confusion(
+                    vm, f"{args.run_name}: VAL confusion (t={thr:.3f})", art / "val_confusion_matrix.png"
+                )
+            ),
+            "val",
+        )
+        mlflow.log_artifact(
+            str(plot_roc(yv, pv, thr, f"{args.run_name}: VAL ROC", art / "val_roc_curve.png")), "val"
+        )
 
         model.cpu().eval()
         mlflow.pytorch.log_model(model, artifact_path="model")
         CANDIDATES.mkdir(parents=True, exist_ok=True)
-        save_checkpoint(model, args.arch, CANDIDATES / f"{args.run_name}.pt",
-                        mlflow_run_id=run.info.run_id, best_epoch=best_epoch)
-        print(f"[{args.run_name}] best val AUC {best_auc:.4f} @ epoch {best_epoch}; "
-              f"val threshold {thr:.4f} -> sens {vm['sensitivity']:.3f}, spec {vm['specificity']:.3f}")
+        save_checkpoint(
+            model,
+            args.arch,
+            CANDIDATES / f"{args.run_name}.pt",
+            mlflow_run_id=run.info.run_id,
+            best_epoch=best_epoch,
+        )
+        print(
+            f"[{args.run_name}] best val AUC {best_auc:.4f} @ epoch {best_epoch}; "
+            f"val threshold {thr:.4f} -> sens {vm['sensitivity']:.3f}, spec {vm['specificity']:.3f}"
+        )
 
 
 if __name__ == "__main__":
