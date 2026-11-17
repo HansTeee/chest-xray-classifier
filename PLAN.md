@@ -195,7 +195,7 @@ MLflow runs (validation, best epoch):
 | 3 | FastAPI service, Grad-CAM, pytest (random-weight fixture), ruff | Done |
 | 4 | Streamlit UI, Dockerfile (API + UI), docker-compose | Done |
 | 5 | Weights as GitHub Release asset, GitHub Actions CI/CD, image published to GHCR | Done |
-| 6 | Portfolio README, demo script | Pending |
+| 6 | Portfolio README, demo script | Done |
 
 ## 7. Known limitations (to be stated everywhere results appear)
 
