@@ -74,10 +74,32 @@ flowchart LR
 4. The official `test/` split is the held-out test set. It is not touched
    until the final evaluation.
 
+### Data findings (Phase 2, recorded before training)
+
+- The raw download contains the dataset twice: `chest_xray/` and a nested
+  `chest_xray/chest_xray/` copy that has an extra `.DS_Store` per folder.
+  It also contains `__MACOSX/`. Only the top-level copy is used.
+- The official 16-image `val/` is folded back into train before the
+  patient-level split.
+- Patient keys: PNEUMONIA `personN_{bacteria|virus}_K` -> `personN`;
+  NORMAL `IM-XXXX-K` / `NORMAL2-IM-XXXX-K` -> the prefix before the last
+  `-K`. 808 `personN` IDs in train have both bacteria and virus images,
+  so grouping by `personN` alone is the conservative choice (it may merge
+  two people, but never splits one).
+- **Possible train/test leakage in the official split:** 170 pneumonia
+  patient-ID strings occur in both official train and official test. They
+  never share the same pathogen type and no filenames are identical, so they
+  may be reused numbers rather than the same people. This cannot be verified
+  from the data. The official test set is kept unchanged (as pre-registered
+  and as used in the literature), and this caveat is reported with the
+  results.
+
 ## 4. Modeling plan
 
 - GPU detected (RTX 4060 Laptop, 8 GB): DenseNet121 or EfficientNet-B0 with
-  ImageNet weights. If no GPU: ResNet18 at 224px, backbone frozen except the
+  ImageNet weights. **Chosen: DenseNet121** (AMP, batch 32, AdamW, cosine
+  schedule, 8 epochs, about 17-22 s per epoch on AC power). Augmentation
+  runs batched on the GPU. If no GPU: ResNet18 at 224px, backbone frozen except the
   last block, and one epoch is timed before committing to a full run.
 - Class imbalance (about 3:1 pneumonia) is handled with class-weighted
   cross-entropy.
@@ -108,15 +130,63 @@ favors sensitivity, and specificity is expected to pay for it.
 that still gives sensitivity >= 0.95. That single fixed threshold is then
 applied to the test set.
 
-**Results** (filled in after the single test evaluation, pass/fail, including
-any failures): _pending_.
+### Results (single test evaluation, 2026-11-17)
+
+Selected model: **DenseNet121**, full fine-tune, lr 3e-4, best epoch 7
+(MLflow run `dn121_full_lr3e-4`). Chosen by **validation AUC**.
+Threshold from validation: **t = 0.316** (validation sensitivity 0.986,
+specificity 1.000).
+
+| # | Criterion | Target | Result (test, n=624) | Verdict |
+|---|---|---|---|---|
+| 1 | ROC-AUC | >= 0.90 | **0.982** | **PASS** |
+| 2 | Sensitivity @ t=0.316 | >= 0.95 | **0.992** (387/390; 3 missed pneumonias) | **PASS** |
+| 3 | Specificity @ t=0.316 | report honestly | **0.739** (173/234; **61 false alarms**) | Reported, and it is weak |
+| 4 | Threshold chosen on validation only | process | Yes | **PASS** |
+| 5 | Test evaluated once, no tuning | process | Yes (see note) | **PASS** |
+
+Other test metrics: PPV 0.864, NPV 0.983, accuracy 0.897.
+Confusion matrix (test): TN 173 · FP 61 · FN 3 · TP 387.
+
+**Honest reading of these numbers:**
+- **Specificity drops sharply from validation (1.00) to test (0.74).** The
+  validation set comes from the same pool as training, so it was too easy:
+  it could not reveal this. The official test set behaves like a shifted
+  distribution, and about 1 in 4 healthy children would be flagged. In a
+  screening setting that means many unnecessary follow-ups. This is the
+  model's main weakness.
+- The threshold rule ("highest threshold with validation sensitivity >=
+  0.95") actually reached 0.986 validation sensitivity, because validation
+  specificity was already perfect. On test this produced high sensitivity at
+  the expense of specificity.
+- The validation AUCs of the two full-fine-tune runs tied to 6 decimals
+  (0.999470). The lr 3e-4 run was selected by MLflow's ordering. No test
+  information was used to break the tie.
+- Possible train/test patient-ID overlap in the official split (Section 3)
+  may inflate test results. This cannot be ruled out.
+
+**Process note (disclosed for transparency):** the first run of
+`src.evaluate final` computed test predictions and then crashed while
+writing JSON (a numpy bool was not serializable), before any metric was
+printed or saved. Only the serialization was fixed. The same frozen model
+and the same validation-derived threshold were used, and the rerun is the
+only time test metrics were seen. `models/test_results.json` now blocks any
+further test evaluation.
+
+MLflow runs (validation, best epoch):
+
+| Run | Unfrozen | LR | Best val AUC | Val threshold | Val sens / spec |
+|---|---|---|---|---|---|
+| dn121_full_lr3e-4 (selected) | all | 3e-4 | 0.99947 | 0.316 | 0.986 / 1.000 |
+| dn121_full_lr1e-4 | all | 1e-4 | 0.99947 | 0.520 | 0.985 / 1.000 |
+| dn121_last1_lr1e-3 | denseblock4 + head | 1e-3 | 0.99823 | 0.800 | 0.957 / 1.000 |
 
 ## 6. Phases
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Plan, scaffold, venv, requirements, CLAUDE.md, first commit | Done |
-| 2 | Data normalization, patient split, training + MLflow, threshold, single test eval, model card | Pending |
+| 2 | Data normalization, patient split, training + MLflow, threshold, single test eval, model card | Done |
 | 3 | FastAPI service, Grad-CAM, pytest (random-weight fixture), ruff | Pending |
 | 4 | Streamlit UI, Dockerfile (API + UI), docker-compose | Pending |
 | 5 | HF model repo upload, GitHub Actions CI/CD, HF Space deploy | Pending |

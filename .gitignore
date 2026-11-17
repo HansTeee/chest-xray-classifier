@@ -30,3 +30,10 @@ htmlcov/
 Thumbs.db
 .vscode/
 .idea/
+
+# Weights in any subfolder (candidates, checkpoints) and local scratch artifacts
+models/**/*.pt
+models/candidates/
+models/_artifacts/
+models/_eval_artifacts/
+models/train_log.txt

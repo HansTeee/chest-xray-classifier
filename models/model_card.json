@@ -1,0 +1,106 @@
+{
+  "model_name": "chest-xray-pneumonia-classifier",
+  "disclaimer": "Educational demo only. Not a medical device. Not for clinical use.",
+  "architecture": "densenet121",
+  "pretrained_on": "ImageNet-1k (torchvision IMAGENET1K_V1)",
+  "classes": [
+    "NORMAL",
+    "PNEUMONIA"
+  ],
+  "positive_class": "PNEUMONIA",
+  "input": {
+    "size": [
+      224,
+      224
+    ],
+    "channels": "grayscale replicated to RGB",
+    "normalization": {
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ]
+    }
+  },
+  "threshold": 0.31578874588012695,
+  "threshold_selection": "Highest threshold with validation sensitivity >= 0.95",
+  "validation_metrics": {
+    "auc": 0.9994704013181123,
+    "sensitivity": 0.9863481228668942,
+    "specificity": 1.0,
+    "ppv": 1.0,
+    "npv": 0.9620853080568721,
+    "accuracy": 0.9898605830164765,
+    "tn": 203,
+    "fp": 0,
+    "fn": 8,
+    "tp": 578
+  },
+  "test_metrics": {
+    "auc": 0.9823361823361824,
+    "sensitivity": 0.9923076923076923,
+    "specificity": 0.7393162393162394,
+    "ppv": 0.8638392857142857,
+    "npv": 0.9829545454545454,
+    "accuracy": 0.8974358974358975,
+    "tn": 173,
+    "fp": 61,
+    "fn": 3,
+    "tp": 387
+  },
+  "pre_registered_criteria": {
+    "test_auc_ge_0.90": true,
+    "test_sensitivity_ge_0.95": true,
+    "threshold_chosen_on_validation_only": true,
+    "test_evaluated_once": true
+  },
+  "training": {
+    "amp": "True",
+    "arch": "densenet121",
+    "augmentation": "rotation10, affine(translate .05, scale .95-1.05), brightness/contrast .2, NO hflip",
+    "batch_size": "32",
+    "class_weights": "[1.9385, 0.6738]",
+    "device": "cuda",
+    "epochs": "8",
+    "img_size": "224",
+    "lr": "0.0003",
+    "n_train": "4443",
+    "n_val": "789",
+    "optimizer": "AdamW",
+    "pretrained": "imagenet",
+    "scheduler": "cosine",
+    "seed": "42",
+    "trainable_params": "6955906",
+    "unfreeze": "all",
+    "weight_decay": "0.0001"
+  },
+  "mlflow_run_id": "d3151f185bdb496388686d178a5f1737",
+  "mlflow_run_name": "dn121_full_lr3e-4",
+  "dataset": {
+    "name": "Chest X-Ray Images (Pneumonia)",
+    "source": "Kermany et al., Mendeley Data v2, doi:10.17632/rscbjbr9sj.2 (Kaggle mirror paultimothymooney/chest-xray-pneumonia)",
+    "license": "CC BY 4.0",
+    "population": "Pediatric patients aged 1-5, Guangzhou Women and Children's Medical Center",
+    "splits": {
+      "train": {
+        "NORMAL": 1146,
+        "PNEUMONIA": 3297
+      },
+      "val": {
+        "NORMAL": 203,
+        "PNEUMONIA": 586
+      },
+      "test": {
+        "NORMAL": 234,
+        "PNEUMONIA": 390
+      }
+    },
+    "split_method": "Patient-level 15% validation carved from official train (seed 42); official test set held out and evaluated once."
+  },
+  "created_utc": "2026-11-17T09:46:54+00:00"
+}

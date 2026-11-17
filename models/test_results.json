@@ -1,0 +1,23 @@
+{
+  "threshold": 0.31578874588012695,
+  "test": {
+    "auc": 0.9823361823361824,
+    "sensitivity": 0.9923076923076923,
+    "specificity": 0.7393162393162394,
+    "ppv": 0.8638392857142857,
+    "npv": 0.9829545454545454,
+    "accuracy": 0.8974358974358975,
+    "tn": 173,
+    "fp": 61,
+    "fn": 3,
+    "tp": 387
+  },
+  "criteria": {
+    "test_auc_ge_0.90": true,
+    "test_sensitivity_ge_0.95": true,
+    "threshold_chosen_on_validation_only": true,
+    "test_evaluated_once": true
+  },
+  "run_id": "d3151f185bdb496388686d178a5f1737",
+  "created_utc": "2026-11-17T09:46:54+00:00"
+}
