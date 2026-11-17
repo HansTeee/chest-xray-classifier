@@ -89,6 +89,29 @@ Confusion matrix: TN 173 · FP 61 · FN 3 · TP 387.
 The two full fine-tune runs tied on validation AUC to six decimals. The tie
 was broken by MLflow's sort order, with no test information involved.
 
+**Test set (selected model, threshold 0.316, evaluated once):**
+
+| Confusion matrix | ROC curve |
+|---|---|
+| ![Test confusion matrix: TN 173, FP 61, FN 3, TP 387](docs/mlflow/test_confusion_matrix.png) | ![Test ROC curve, AUC 0.982, operating point sensitivity 0.99 specificity 0.74](docs/mlflow/test_roc_curve.png) |
+
+Compare these with the validation plots below. On validation the model had
+**zero** false positives (specificity 1.00), while on test it had **61**.
+That gap is the distribution shift discussed above.
+
+<details>
+<summary>MLflow run comparison and validation plots for all 3 runs</summary>
+
+![MLflow compare view of the three runs: parameters and metrics](docs/mlflow/run_comparison.png)
+
+| Run | Validation confusion matrix | Validation ROC |
+|---|---|---|
+| `dn121_full_lr3e-4` ✔ | ![](docs/mlflow/val_confusion_dn121_full_lr3e-4.png) | ![](docs/mlflow/val_roc_dn121_full_lr3e-4.png) |
+| `dn121_full_lr1e-4` | ![](docs/mlflow/val_confusion_dn121_full_lr1e-4.png) | ![](docs/mlflow/val_roc_dn121_full_lr1e-4.png) |
+| `dn121_last1_lr1e-3` | ![](docs/mlflow/val_confusion_dn121_last1_lr1e-3.png) | ![](docs/mlflow/val_roc_dn121_last1_lr1e-3.png) |
+
+</details>
+
 ---
 
 ## Architecture
